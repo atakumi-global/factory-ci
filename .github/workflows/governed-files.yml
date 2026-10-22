@@ -1,0 +1,56 @@
+# Reusable: protects the files that govern agents under the no-PR workflow.
+# Fails when a pushed commit changes a path listed in CODEOWNERS and its author is
+# not an owner. Agents must commit with their own identity (not the owner's).
+#
+# Caller (on push to dev):
+#   jobs:
+#     governed-files:
+#       uses: atakumi-global/factory-ci/.github/workflows/governed-files.yml@v1
+#       with:
+#         owners: |
+#           martijn@example.com
+name: governed-files
+
+on:
+  workflow_call:
+    inputs:
+      owners:
+        description: Author emails allowed to change governed files, one per line
+        type: string
+        required: true
+      paths_file:
+        description: File listing governed paths (CODEOWNERS format; first column used)
+        type: string
+        default: CODEOWNERS
+      factory_ref:
+        type: string
+        default: v1
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: atakumi-global/factory-ci
+          ref: ${{ inputs.factory_ref }}
+          path: .factory-ci
+          persist-credentials: false
+      - name: Check governed files
+        env:
+          OWNERS: ${{ inputs.owners }}
+          BASE: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+          PATHS_FILE: ${{ inputs.paths_file }}
+        run: |
+          test -f "$PATHS_FILE" || { echo "::error::$PATHS_FILE not found"; exit 1; }
+          printf '%s\n' "$OWNERS" > "$RUNNER_TEMP/owners"
+          bash .factory-ci/scripts/governed-files.sh "$BASE" "$HEAD_SHA" "$RUNNER_TEMP/owners" "$PATHS_FILE"

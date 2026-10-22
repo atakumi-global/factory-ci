@@ -1,0 +1,75 @@
+# Reusable: fast-forward one branch to another (dev -> stage, stage -> prod).
+# Refuses unless every check on the source commit has passed. Set `environment` to a
+# GitHub environment with required reviewers (e.g. "production") so the job waits
+# for the owner's approval — signed in with a passkey — before anything moves.
+#
+# Caller (promote-to-prod.yml):
+#   on: { workflow_dispatch: {} }
+#   jobs:
+#     promote:
+#       uses: atakumi-global/factory-ci/.github/workflows/promote.yml@v1
+#       with: { source: stage, target: prod, environment: production }
+#       permissions: { contents: write, checks: read, statuses: read }
+name: promote
+
+on:
+  workflow_call:
+    inputs:
+      source:
+        type: string
+        required: true
+      target:
+        type: string
+        required: true
+      environment:
+        description: GitHub environment that gates this promotion (required reviewers)
+        type: string
+        required: true
+
+permissions:
+  contents: write
+  checks: read
+  statuses: read
+
+concurrency:
+  group: promote-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - name: Require green checks on ${{ inputs.source }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE: ${{ inputs.source }}
+          REPO: ${{ github.repository }}
+        run: |
+          git fetch origin "$SOURCE"
+          sha="$(git rev-parse "origin/$SOURCE")"
+          echo "source $SOURCE at $sha"
+          runs="$(gh api "repos/$REPO/commits/$sha/check-runs?per_page=100" \
+            --jq '[.check_runs[] | select(.name != "promote" and (.name | test("^promote") | not))]')"
+          total="$(jq 'length' <<<"$runs")"
+          bad="$(jq '[.[] | select(.status != "completed" or (.conclusion != "success" and .conclusion != "skipped" and .conclusion != "neutral"))] | length' <<<"$runs")"
+          if [ "$total" -eq 0 ]; then echo "::error::no checks have run on $sha; refusing to promote"; exit 1; fi
+          if [ "$bad" -ne 0 ]; then
+            jq -r '.[] | select(.status != "completed" or (.conclusion != "success" and .conclusion != "skipped" and .conclusion != "neutral")) | "::error::\(.name): \(.status)/\(.conclusion)"' <<<"$runs"
+            exit 1
+          fi
+          echo "all $total checks passed"
+      - name: Fast-forward ${{ inputs.target }} to ${{ inputs.source }}
+        env:
+          SOURCE: ${{ inputs.source }}
+          TARGET: ${{ inputs.target }}
+        run: |
+          git fetch origin "$SOURCE" "$TARGET"
+          git checkout -B "$TARGET" "origin/$TARGET"
+          git merge --ff-only "origin/$SOURCE"
+          git push origin "$TARGET"
+          echo "promoted $SOURCE -> $TARGET at $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"

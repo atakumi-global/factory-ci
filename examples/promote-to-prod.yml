@@ -1,0 +1,18 @@
+# Copy to <repo>/.github/workflows/promote-to-prod.yml
+# The "production" environment must have the owner as required reviewer.
+name: Promote to prod
+
+on:
+  workflow_dispatch:
+
+jobs:
+  promote:
+    uses: atakumi-global/factory-ci/.github/workflows/promote.yml@v1
+    with:
+      source: stage
+      target: prod            # "main" in repositories whose production branch is main
+      environment: production
+    permissions:
+      contents: write
+      checks: read
+      statuses: read

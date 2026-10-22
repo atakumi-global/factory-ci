@@ -1,0 +1,57 @@
+# Reusable: secret, code, dependency and configuration scans.
+# The same checks as factory-check, which agents run before merging into dev.
+#
+# Caller:
+#   jobs:
+#     security:
+#       uses: atakumi-global/factory-ci/.github/workflows/security.yml@v1
+name: security
+
+on:
+  workflow_call:
+    inputs:
+      factory_ref:
+        description: Ref of factory-ci to take the scanner installer from (keep equal to the @ref you call)
+        type: string
+        default: v1
+      severity:
+        description: Trivy severities that fail the job
+        type: string
+        default: HIGH,CRITICAL
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository (full history for secret scanning)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check out factory-ci
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: atakumi-global/factory-ci
+          ref: ${{ inputs.factory_ref }}
+          path: .factory-ci
+          persist-credentials: false
+
+      - name: Install pinned scanners (checksum-verified)
+        run: bash .factory-ci/scripts/install-scanners.sh
+
+      - name: Secrets in history (gitleaks)
+        run: gitleaks git --redact --no-banner --exit-code 1 .
+
+      - name: Code scan (semgrep)
+        run: semgrep scan --config p/default --config p/secrets --error --metrics=off --exclude .factory-ci
+
+      - name: Dependency vulnerabilities (osv-scanner)
+        run: osv-scanner scan source -r .
+
+      - name: Misconfiguration and vulnerabilities (trivy)
+        run: trivy fs --scanners vuln,misconfig,secret --severity "${{ inputs.severity }}" --exit-code 1 --skip-dirs .factory-ci .

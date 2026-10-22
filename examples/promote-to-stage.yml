@@ -1,0 +1,17 @@
+# Copy to <repo>/.github/workflows/promote-to-stage.yml
+name: Promote to stage
+
+on:
+  workflow_dispatch:
+
+jobs:
+  promote:
+    uses: atakumi-global/factory-ci/.github/workflows/promote.yml@v1
+    with:
+      source: dev
+      target: stage
+      environment: staging
+    permissions:
+      contents: write
+      checks: read
+      statuses: read

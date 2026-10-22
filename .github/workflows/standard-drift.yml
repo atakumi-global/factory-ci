@@ -1,0 +1,59 @@
+# Reusable: reports whether a repository is on the current factory standard.
+# Checks the golden set and the version of the shared AGENTS.md section.
+# Run it on a schedule in each repository; a failure means "upgrade due".
+#
+# Caller:
+#   on: { schedule: [{ cron: "17 19 * * 0" }], workflow_dispatch: {} }
+#   jobs:
+#     drift:
+#       uses: atakumi-global/factory-ci/.github/workflows/standard-drift.yml@v1
+name: standard-drift
+
+on:
+  workflow_call:
+    inputs:
+      standards_ref:
+        description: Ref of factory-standards to compare against
+        type: string
+        default: main
+      ui_project:
+        description: Also require design-system/DESIGN.md and prototypes/
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: atakumi-global/factory-standards
+          ref: ${{ inputs.standards_ref }}
+          path: .factory-standards
+          persist-credentials: false
+      - name: Golden set present
+        env:
+          UI: ${{ inputs.ui_project }}
+        run: |
+          missing=0
+          req="AGENTS.md CONSTITUTION.md HANDOVER.md .plane.json CODEOWNERS"
+          [ "$UI" = "true" ] && req="$req design-system/DESIGN.md prototypes"
+          for f in $req; do [ -e "$f" ] || { echo "::error::missing $f"; missing=1; }; done
+          for f in CLAUDE.md .opencode/rules.md docs/todo.md; do
+            [ -e "$f" ] && { echo "::error::$f should be folded into AGENTS.md / Plane"; missing=1; }
+          done
+          exit $missing
+      - name: Shared AGENTS.md section is current
+        run: |
+          v="$(cat .factory-standards/VERSION)"
+          python3 .factory-standards/scripts/sync_agents_md.py \
+            --shared .factory-standards/agents/AGENTS.shared.md --version "$v" \
+            --target AGENTS.md --check \
+            || { echo "::error::AGENTS.md shared section is not factory-standards v$v. Run sync_agents_md.py and commit (owner)."; exit 1; }
