@@ -51,7 +51,14 @@ jobs:
         run: semgrep scan --config p/default --config p/secrets --error --metrics=off --exclude .factory-ci
 
       - name: Dependency vulnerabilities (osv-scanner)
-        run: osv-scanner scan source -r .
+        # A root osv-scanner.toml (governed, owner-approved) lists accepted findings
+        # with a reason and an expiry date.
+        run: |
+          if [ -f osv-scanner.toml ]; then
+            osv-scanner scan source --config osv-scanner.toml -r .
+          else
+            osv-scanner scan source -r .
+          fi
 
       - name: Misconfiguration and vulnerabilities (trivy)
         run: trivy fs --scanners vuln,misconfig,secret --severity "${{ inputs.severity }}" --exit-code 1 --skip-dirs .factory-ci .
