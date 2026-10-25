@@ -19,7 +19,7 @@ Ready-to-copy callers are in `examples/`.
 1. Copy `examples/factory.yml`, `examples/standard.yml`, `examples/promote-to-stage.yml`
    and `examples/promote-to-prod.yml` into `.github/workflows/`. Replace the owner
    email in `factory.yml`. Remove any older promote workflows they replace.
-2. Settings → Environments: create `staging` (no reviewers) and `production` with
+2. Settings → Environments: create `stage` (no reviewers) and `prod` with
    **Required reviewers: the owner** and **Deployment branches: `prod` (or `main`)
    only**. Your GitHub account signs in with a passkey, so approving a production
    promotion needs your phone or hardware key.
@@ -28,7 +28,7 @@ Ready-to-copy callers are in `examples/`.
      the promote workflow (GitHub Actions) can push.
    - `dev`: block force pushes and deletion. Agents push directly (no PRs); the
      `factory` workflow scans every push.
-4. Coolify: staging deploys from `stage`, production from `prod`/`main`. Turn off
+4. Coolify: stage deploys from the `stage` branch, prod from `prod`/`main`. Turn off
    auto-deploy for any other branch.
 5. Agents commit with their own git identity (never the owner's email), so
    `governed-files` can tell them apart.

@@ -1,6 +1,6 @@
 # Reusable: fast-forward one branch to another (dev -> stage, stage -> prod).
 # Refuses unless every check on the source commit has passed. Set `environment` to a
-# GitHub environment with required reviewers (e.g. "production") so the job waits
+# GitHub environment with required reviewers (e.g. "prod") so the job waits
 # for the owner's approval — signed in with a passkey — before anything moves.
 #
 # Caller (promote-to-prod.yml):
@@ -8,7 +8,7 @@
 #   jobs:
 #     promote:
 #       uses: atakumi-global/factory-ci/.github/workflows/promote.yml@v1
-#       with: { source: stage, target: prod, environment: production }
+#       with: { source: stage, target: prod, environment: prod }
 #       permissions: { contents: write, checks: read, statuses: read }
 name: promote
 
