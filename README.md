@@ -20,8 +20,9 @@ Ready-to-copy callers are in `examples/`.
    and `examples/promote-to-prod.yml` into `.github/workflows/`. Replace the owner
    email in `factory.yml`. Remove any older promote workflows they replace.
 2. Settings → Environments: create `stage` (no reviewers) and `prod` with
-   **Required reviewers: the owner** and **Deployment branches: `prod` (or `main`)
-   only**. Your GitHub account signs in with a passkey, so approving a production
+   **Required reviewers: the owner** and **Deployment branches: `stage` only**.
+   GitHub checks the branch the workflow runs from, so Promote to prod is run from
+   `stage`; a `prod` rule would block it. Your GitHub account signs in with a passkey, so approving a production
    promotion needs your phone or hardware key.
 3. Branch rules (Settings → Rules → Rulesets):
    - `stage`, `prod`/`main`: block force pushes and deletion; restrict updates so only
