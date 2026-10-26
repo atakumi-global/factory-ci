@@ -12,6 +12,8 @@ jobs:
       source: stage
       target: prod            # "main" in repositories whose production branch is main
       environment: prod
+    secrets:
+      deploy_key: ${{ secrets.PROMOTE_DEPLOY_KEY }}   # created by setup-project
     permissions:
       contents: write
       checks: read

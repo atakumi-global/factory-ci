@@ -3,12 +3,17 @@
 # GitHub environment with required reviewers (e.g. "prod") so the job waits
 # for the owner's approval — signed in with a passkey — before anything moves.
 #
+# With the deploy_key secret (the repository's PROMOTE_DEPLOY_KEY, created by
+# setup-project), the push uses that deploy key: the only actor the factory-promotion
+# ruleset lets update stage and prod. Without it the push uses the workflow token.
+#
 # Caller (promote-to-prod.yml):
 #   on: { workflow_dispatch: {} }
 #   jobs:
 #     promote:
 #       uses: atakumi-global/factory-ci/.github/workflows/promote.yml@v1
 #       with: { source: stage, target: prod, environment: prod }
+#       secrets: { deploy_key: "${{ secrets.PROMOTE_DEPLOY_KEY }}" }
 #       permissions: { contents: write, checks: read, statuses: read }
 name: promote
 
@@ -25,6 +30,10 @@ on:
         description: GitHub environment that gates this promotion (required reviewers)
         type: string
         required: true
+    secrets:
+      deploy_key:
+        description: Private SSH deploy key with write access (bypass actor of the factory-promotion ruleset)
+        required: false
 
 permissions:
   contents: write
@@ -67,9 +76,22 @@ jobs:
         env:
           SOURCE: ${{ inputs.source }}
           TARGET: ${{ inputs.target }}
+          REPO: ${{ github.repository }}
+          DEPLOY_KEY: ${{ secrets.deploy_key }}
         run: |
           git fetch origin "$SOURCE" "$TARGET"
           git checkout -B "$TARGET" "origin/$TARGET"
           git merge --ff-only "origin/$SOURCE"
-          git push origin "$TARGET"
+          if [ -n "$DEPLOY_KEY" ]; then
+            # GitHub's published ed25519 host key (SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU)
+            mkdir -p ~/.ssh && chmod 700 ~/.ssh
+            echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" > ~/.ssh/known_hosts
+            printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/promote_key && chmod 600 ~/.ssh/promote_key
+            GIT_SSH_COMMAND="ssh -i ~/.ssh/promote_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes" \
+              git push "git@github.com:$REPO.git" "$TARGET:$TARGET"
+            rm -f ~/.ssh/promote_key
+            echo "pushed with the promote deploy key" >> "$GITHUB_STEP_SUMMARY"
+          else
+            git push origin "$TARGET"
+          fi
           echo "promoted $SOURCE -> $TARGET at $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
