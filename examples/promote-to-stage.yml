@@ -11,7 +11,9 @@ jobs:
       source: dev
       target: stage
       environment: stage
-    secrets: inherit          # PROMOTE_DEPLOY_KEY, created by setup-project (repository or environment secret)
+    secrets:
+      deploy_key: ${{ secrets.PROMOTE_DEPLOY_KEY }}   # repository secret (public repos); a private repo's
+                                                      # environment secret reaches promote.yml by itself
     permissions:
       contents: write
       checks: read

@@ -11,8 +11,10 @@
 # lets update stage and prod. setup-project stores it either as the repository secret
 # PROMOTE_DEPLOY_KEY, passed in as deploy_key, or (private repositories) as an
 # environment secret PROMOTE_DEPLOY_KEY on stage and prod, which only a job running in
-# that environment, from its allowed branch, can read. Without a key the push uses the
-# workflow token.
+# that environment, from its allowed branch, can read: GitHub gives a reusable workflow's
+# job the secrets of the environment it runs in, so the caller does not pass it (and
+# does not need `secrets: inherit`, which hands every secret over). Without a key the push
+# uses the workflow token, which the factory-promotion ruleset refuses.
 #
 # Caller (promote-to-prod.yml), repository secret:
 #   on: { workflow_dispatch: {} }
@@ -22,7 +24,8 @@
 #       with: { source: stage, target: prod, environment: prod }
 #       secrets: { deploy_key: "${{ secrets.PROMOTE_DEPLOY_KEY }}" }
 #       permissions: { contents: write, checks: read, statuses: read }
-# Caller, environment secret (private repositories): the same with `secrets: inherit`.
+# The same caller works for private repositories: deploy_key is then empty and the
+# environment secret is used.
 name: promote
 
 on:
