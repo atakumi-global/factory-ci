@@ -1,13 +1,20 @@
 # Reusable: fast-forward one branch to another (dev -> stage, stage -> prod).
-# Refuses unless every check on the source commit has passed. Set `environment` to a
-# GitHub environment with required reviewers (e.g. "prod") so the job waits
-# for the owner's approval — signed in with a passkey — before anything moves.
+# Refuses unless the person who started it is an admin of the repository (the owner;
+# agents and the agents' machine account have write at most), and unless every check on
+# the source commit has passed. `environment` names the GitHub environment of the target
+# (stage or prod). In a public repository prod has required reviewers, so the job also
+# waits for the owner's approval, signed in with a passkey. A private repository on
+# GitHub Free, Pro or Team cannot have required reviewers; there the admin check is the
+# gate (only the owner, signed in with his passkey, can start a promotion).
 #
-# With the deploy_key secret (the repository's PROMOTE_DEPLOY_KEY, created by
-# setup-project), the push uses that deploy key: the only actor the factory-promotion
-# ruleset lets update stage and prod. Without it the push uses the workflow token.
+# The push uses the promote deploy key: the only actor the factory-promotion ruleset
+# lets update stage and prod. setup-project stores it either as the repository secret
+# PROMOTE_DEPLOY_KEY, passed in as deploy_key, or (private repositories) as an
+# environment secret PROMOTE_DEPLOY_KEY on stage and prod, which only a job running in
+# that environment, from its allowed branch, can read. Without a key the push uses the
+# workflow token.
 #
-# Caller (promote-to-prod.yml):
+# Caller (promote-to-prod.yml), repository secret:
 #   on: { workflow_dispatch: {} }
 #   jobs:
 #     promote:
@@ -15,6 +22,7 @@
 #       with: { source: stage, target: prod, environment: prod }
 #       secrets: { deploy_key: "${{ secrets.PROMOTE_DEPLOY_KEY }}" }
 #       permissions: { contents: write, checks: read, statuses: read }
+# Caller, environment secret (private repositories): the same with `secrets: inherit`.
 name: promote
 
 on:
@@ -34,6 +42,9 @@ on:
       deploy_key:
         description: Private SSH deploy key with write access (bypass actor of the factory-promotion ruleset)
         required: false
+      PROMOTE_DEPLOY_KEY:
+        description: The same key as an environment secret of the target environment (private repositories)
+        required: false
 
 permissions:
   contents: write
@@ -50,6 +61,18 @@ jobs:
     timeout-minutes: 15
     environment: ${{ inputs.environment }}
     steps:
+      - name: Only a repository admin may promote
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          WHO: ${{ github.triggering_actor }}
+        run: |
+          perm="$(gh api "repos/$REPO/collaborators/$WHO/permission" --jq .permission 2>/dev/null || true)"
+          if [ "$perm" != "admin" ]; then
+            echo "::error::$WHO started this promotion with permission '${perm:-none}'; only a repository admin (the owner) may promote"
+            exit 1
+          fi
+          echo "started by $WHO (admin)" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
@@ -77,7 +100,7 @@ jobs:
           SOURCE: ${{ inputs.source }}
           TARGET: ${{ inputs.target }}
           REPO: ${{ github.repository }}
-          DEPLOY_KEY: ${{ secrets.deploy_key }}
+          DEPLOY_KEY: ${{ secrets.PROMOTE_DEPLOY_KEY || secrets.deploy_key }}
         run: |
           git fetch origin "$SOURCE" "$TARGET"
           git checkout -B "$TARGET" "origin/$TARGET"
