@@ -11,8 +11,7 @@ jobs:
       source: dev
       target: stage
       environment: stage
-    secrets:
-      deploy_key: ${{ secrets.PROMOTE_DEPLOY_KEY }}   # created by setup-project
+    secrets: inherit          # PROMOTE_DEPLOY_KEY, created by setup-project (repository or environment secret)
     permissions:
       contents: write
       checks: read
