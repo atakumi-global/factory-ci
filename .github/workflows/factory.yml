@@ -1,4 +1,6 @@
-# Copy to <repo>/.github/workflows/factory.yml
+# The factory-ci repository runs its own reusable workflows from the branch under
+# test, so a fix to them is checked before the v1 tag moves. examples/factory.yml
+# is the copy template for every other repository (it pins @v1).
 # Security scans on every branch push; governed-file protection on dev.
 # Keep the project's own tests in its existing ci.yml.
 name: factory
@@ -13,11 +15,11 @@ permissions:
 
 jobs:
   security:
-    uses: atakumi-global/factory-ci/.github/workflows/security.yml@v1
+    uses: ./.github/workflows/security.yml
 
   governed-files:
     if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
-    uses: atakumi-global/factory-ci/.github/workflows/governed-files.yml@v1
+    uses: ./.github/workflows/governed-files.yml
     with:
       owners: |
         martijn@atakumi.com
