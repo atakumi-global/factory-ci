@@ -61,4 +61,6 @@ jobs:
           fi
 
       - name: Misconfiguration and vulnerabilities (trivy)
-        run: trivy fs --scanners vuln,misconfig,secret --severity "${{ inputs.severity }}" --exit-code 1 --skip-dirs .factory-ci .
+        env:
+          SEVERITY: ${{ inputs.severity }}
+        run: trivy fs --scanners vuln,misconfig,secret --severity "$SEVERITY" --exit-code 1 --skip-dirs .factory-ci .
