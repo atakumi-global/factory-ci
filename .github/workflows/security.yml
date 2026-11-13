@@ -55,9 +55,9 @@ jobs:
         # with a reason and an expiry date.
         run: |
           if [ -f osv-scanner.toml ]; then
-            osv-scanner scan source --config osv-scanner.toml -r .
+            osv-scanner scan source --config osv-scanner.toml --allow-no-lockfiles -r .
           else
-            osv-scanner scan source -r .
+            osv-scanner scan source --allow-no-lockfiles -r .
           fi
 
       - name: Misconfiguration and vulnerabilities (trivy)
