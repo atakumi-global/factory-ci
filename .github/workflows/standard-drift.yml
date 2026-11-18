@@ -1,6 +1,7 @@
 # Reusable: reports whether a repository is on the current factory standard.
-# Checks the golden set and the version of the shared AGENTS.md section.
-# Run it on a schedule in each repository; a failure means "upgrade due".
+# Checks the golden set. The standard itself is installed with the agent runtime and
+# loaded into every session, so a repository carries no copy and nothing to sync.
+# Run it on a schedule in each repository; a failure means "adoption due".
 #
 # Caller:
 #   on: { schedule: [{ cron: "17 19 * * 0" }], workflow_dispatch: {} }
@@ -50,10 +51,6 @@ jobs:
             [ -e "$f" ] && { echo "::error::$f should be folded into AGENTS.md / Plane"; missing=1; }
           done
           exit $missing
-      - name: Shared AGENTS.md section is current
+      - name: Report an old copied standard section
         run: |
-          v="$(cat .factory-standards/VERSION)"
-          python3 .factory-standards/scripts/sync_agents_md.py \
-            --shared .factory-standards/agents/AGENTS.shared.md --version "$v" \
-            --target AGENTS.md --check \
-            || { echo "::error::AGENTS.md shared section is not factory-standards v$v. Run sync_agents_md.py and commit (owner)."; exit 1; }
+          python3 .factory-standards/scripts/sync_agents_md.py --target AGENTS.md --check
