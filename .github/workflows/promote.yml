@@ -98,6 +98,21 @@ jobs:
             exit 1
           fi
           echo "all $total checks passed"
+      - name: Refuse a diverged ${{ inputs.target }}
+        env:
+          SOURCE: ${{ inputs.source }}
+          TARGET: ${{ inputs.target }}
+        run: |
+          git fetch origin "$SOURCE" "$TARGET"
+          diverged="$(git rev-list --count "origin/$SOURCE..origin/$TARGET")"
+          if [ "$diverged" -eq 0 ]; then
+            echo "$TARGET has no commits that are missing from $SOURCE" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "::error::$TARGET has $diverged commit(s) that are not on $SOURCE, so it cannot be fast-forwarded:"
+          git log --oneline --no-decorate "origin/$SOURCE..origin/$TARGET" | sed 's/^/::error::  /'
+          echo "::error::Bring those commits onto $SOURCE (or back them out of $TARGET) and run the promotion again."
+          exit 1
       - name: Fast-forward ${{ inputs.target }} to ${{ inputs.source }}
         env:
           SOURCE: ${{ inputs.source }}
